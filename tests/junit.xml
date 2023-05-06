@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="1" failures="0" skipped="0" tests="1" time="0.252" timestamp="2023-05-05T20:01:51.665767" hostname="Diegos-MacBook-Pro.local"><testcase classname="" name="tests.test_banking_api" file="tests/test_banking_api.py" time="0.000"><error message="collection failure">ImportError while importing test module '/Users/diegomolano/Downloads/python-coding-challenge-2023-04-10/tests/test_banking_api.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+.venv/lib/python3.9/site-packages/_pytest/python.py:617: in _importtestmodule
+    mod = import_path(self.path, mode=importmode, root=self.config.rootpath)
+.venv/lib/python3.9/site-packages/_pytest/pathlib.py:564: in import_path
+    importlib.import_module(module_name)
+/opt/homebrew/Cellar/python@3.9/3.9.13_1/Frameworks/Python.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+&lt;frozen importlib._bootstrap&gt;:1030: in _gcd_import
+    ???
+&lt;frozen importlib._bootstrap&gt;:1007: in _find_and_load
+    ???
+&lt;frozen importlib._bootstrap&gt;:986: in _find_and_load_unlocked
+    ???
+&lt;frozen importlib._bootstrap&gt;:680: in _load_unlocked
+    ???
+.venv/lib/python3.9/site-packages/_pytest/assertion/rewrite.py:172: in exec_module
+    exec(co, module.__dict__)
+tests/test_banking_api.py:6: in &lt;module&gt;
+    from flask_jwt import current_identity
+E   ModuleNotFoundError: No module named 'flask_jwt'</error></testcase></testsuite></testsuites>
