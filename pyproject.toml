@@ -114,6 +114,7 @@ eventsourcing = "^9.2.18"
 flask-jwt-extended = "^4.4.4"
 PyJWT = "^2.0.0,<3.0.0"
 Flask-RESTful = "^0.3.9"
+python-dotenv = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
 debugpy = "^1.6.2"

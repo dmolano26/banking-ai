@@ -58,6 +58,11 @@ class Bank(Application):
         return account.id
 
     def close_account(self, account_id: UUID) -> None:
+        """Function used to close an existing account
+
+        Args:
+            account_id (UUID)
+        """
         account = self.repository.get(account_id)
         account.close_account()
         self.save(account)
@@ -66,14 +71,13 @@ class Bank(Application):
         """Function used to get an account by email
 
         Args:
-            email_address (str): email of the account to search
+            email_address (str)
 
         Raises:
-            AccountNotFoundError: If the account does not exist, raise
-            an error
+            AccountNotFoundError
 
         Returns:
-            UUID: unique identifier of the account
+            UUID
         """
         account_id = uuid5(NAMESPACE_URL, email_address)
 
@@ -87,14 +91,14 @@ class Bank(Application):
         """Function used to make the authentication process
 
         Args:
-            email_address (str): email of the account
-            password (str): password of the account
+            email_address (str)
+            password (str)
 
         Raises:
-            BadCredentials: If the credentials don't match, raise an error.
+            BadCredentials
 
         Returns:
-            UUID: unique identifier of the account
+            UUID
         """
         account_id = self.get_account_id_by_email(email_address)
         account = self.repository.get(account_id)
@@ -106,11 +110,11 @@ class Bank(Application):
         """Validate if the incoming password matchs with the account's password
 
         Args:
-            account_id (UUID): unique identifier of the account
-            password (str): presunt password
+            account_id (UUID)
+            password (str)
 
         Raises:
-            BadCredentials: If the password does not match, raise an error.
+            BadCredentials
 
         Returns:
             bool
@@ -124,6 +128,13 @@ class Bank(Application):
     def change_password(
         self, account_id: UUID, current_password: str, new_password: str
     ) -> None:
+        """Function used to change the password for the account
+
+        Args:
+            account_id (UUID)
+            current_password (str)
+            new_password (str)
+        """
         if self.validate_password(account_id, current_password):
             account = self.repository.get(account_id)
             account.change_password(new_password)
@@ -133,10 +144,10 @@ class Bank(Application):
         """Get accunt by its id
 
         Args:
-            account_id (UUID): unique identifier of the account
+            account_id (UUID)
 
         Returns:
-            Account: Account instance
+            Account
         """
         return self.repository.get(account_id)
 
@@ -144,10 +155,10 @@ class Bank(Application):
         """Get balance by account ID
 
         Args:
-            account_id (UUID): unique identifier of the account
+            account_id (UUID)
 
         Returns:
-            int: Balance in the account
+            int
         """
         try:
             account = self.repository.get(account_id)
@@ -161,10 +172,9 @@ class Bank(Application):
     def deposit_funds(self, account_id: UUID, amount: int) -> None:
         """Function used to make deposits in your account.
 
-
         Args:
-            account_id (UUID): unique identifier of the account
-            amount (int): Amount you want to deposit in the account
+            account_id (UUID)
+            amount (int)
         """
         account = self.repository.get(account_id)
         account.check_if_closed()
@@ -180,14 +190,12 @@ class Bank(Application):
         """Function used to transfer cash from your account to other
 
         Args:
-            source_account_id (UUID): unique identifier of the source account
-            destination_account_id (UUID): unique identifier of the destination
-            account
-            amount (int): Amount you want tansfer
+            source_account_id (UUID)
+            destination_account_id (UUID)
+            amount (int)
 
         Raises:
-            TransactionError: if the source and destination ids are the same,
-            itraises an error.
+            TransactionError
         """
         source_account = self.repository.get(source_account_id)
         destination_account = self.repository.get(destination_account_id)
@@ -207,8 +215,8 @@ class Bank(Application):
         """Function used to make withdraws.
 
         Args:
-            account_id (UUID): unique identifier of the account
-            amount (int): amount you want to get
+            account_id (UUID)
+            amount (int)
         """
         account = self.repository.get(account_id)
         account.check_if_closed()
@@ -216,10 +224,24 @@ class Bank(Application):
         self.save(account)
 
     def get_overdraft_limit(self, account_id: UUID) -> int:
+        """Function used to get the current overdraft limit of the account
+
+        Args:
+            account_id (UUID)
+
+        Returns:
+            int
+        """
         account = self.repository.get(account_id)
         return account.get_overdraft_limit()
 
     def set_overdraft_limit(self, account_id: UUID, amount: int) -> None:
+        """Function used to set the new overdraft limit to the account
+
+        Args:
+            account_id (UUID)
+            amount (int)
+        """
         account = self.repository.get(account_id)
         account.check_if_closed()
         account.set_overdraft_limit(amount)

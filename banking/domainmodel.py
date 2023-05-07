@@ -32,6 +32,14 @@ class Account(Aggregate):
         email_address: str,
         password: str,
     ):
+        """Constructor, create a new account
+
+        Args:
+            id (UUID)
+            full_name (str)
+            email_address (str)
+            password (str)
+        """
         self._id = id
         self.full_name = full_name
         self.email_address = email_address
@@ -41,19 +49,38 @@ class Account(Aggregate):
         self._overdraft_limit = 0
 
     def get_overdraft_limit(self) -> int:
+        """Get the overdraft limit for the account
+
+        Returns:
+            int
+        """
         return self._overdraft_limit
 
     @event("SetOverdraftLimit")
     def set_overdraft_limit(self, amount: int) -> None:
+        """Set the overdraft limit for the account
+
+        Args:
+            amount (int)
+
+        Raises:
+            AssertionError
+        """
         if amount < 0:
             raise AssertionError("Overdraft limit cannot be negative")
         self._overdraft_limit = amount
 
     @event("Closed")
     def close_account(self) -> None:
+        """Close an existing account"""
         self.is_closed = True
 
     def check_if_closed(self) -> None:
+        """Check if the account is closed
+
+        Raises:
+            AccountClosedError
+        """
         if self.is_closed:
             raise AccountClosedError(self._id)
 
@@ -67,7 +94,7 @@ class Account(Aggregate):
         new_hashed_password = sha512(new_password.encode()).hexdigest()
         self.hashed_password = new_hashed_password
 
-    def authenticate(self, email_address: str, password: str) -> None:
+    def authenticate(self, email_address: str, password: str) -> bool:
         """Function used to make the authentication of the account
 
         Args:
@@ -78,7 +105,7 @@ class Account(Aggregate):
             BadCredentials
 
         Returns:
-            _type_: _description_
+            bool
         """
         hashed_password = sha512(password.encode()).hexdigest()
 
@@ -94,11 +121,10 @@ class Account(Aggregate):
         """aggregate to debit
 
         Args:
-            amount_in_cents (int): amount to debit
+            amount_in_cents (int)
 
         Raises:
-            InsufficientFundsError: if the account has insufficient
-            funds, it raises an error
+            InsufficientFundsError
         """
         if amount_in_cents < 0:
             raise ValueError("Amount to debit can't be less than 0")
