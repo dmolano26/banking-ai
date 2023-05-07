@@ -70,7 +70,7 @@ class DepositResource(Resource):
     def post(self) -> typing.Dict[str, typing.Any]:
         data = request.get_json()
         amount = data["amount"]
-        bank().deposit(UUID(get_jwt_identity()), amount)
+        bank().deposit_funds(UUID(get_jwt_identity()), amount)
         return {"result": "success"}
 
 
@@ -81,7 +81,7 @@ class TransferResource(Resource):
         data = request.get_json()
         amount = data["amount"]
         destination_id = UUID(data["destination_id"])
-        bank().transfer(UUID(get_jwt_identity()), destination_id, amount)
+        bank().transfer_funds(UUID(get_jwt_identity()), destination_id, amount)
         return {"result": "success"}
 
 
@@ -91,7 +91,7 @@ class WithdrawResource(Resource):
     def post(self) -> typing.Dict[str, typing.Any]:
         data = request.get_json()
         amount = data["amount"]
-        bank().withdraw(UUID(get_jwt_identity()), amount)
+        bank().withdraw_funds(UUID(get_jwt_identity()), amount)
         return {"result": "success"}
 
 

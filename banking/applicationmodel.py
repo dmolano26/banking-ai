@@ -1,6 +1,7 @@
 # coding=utf-8
 
 from uuid import NAMESPACE_URL, UUID, uuid5
+from hashlib import sha512
 
 from eventsourcing.application import AggregateNotFound, Application
 
@@ -56,6 +57,11 @@ class Bank(Application):
         self.save(account)
         return account.id
 
+    def close_account(self, account_id: UUID) -> None:
+        account = self.repository.get(account_id)
+        account.close_account()
+        self.save(account)
+
     def get_account_id_by_email(self, email_address: str) -> UUID:
         """Function used to get an account by email
 
@@ -72,9 +78,7 @@ class Bank(Application):
         account_id = uuid5(NAMESPACE_URL, email_address)
 
         try:
-            existing_account = self.repository.get(aggregate_id=account_id)
-            if existing_account is None:
-                raise AccountNotFoundError(email_address)
+            existing_account = self.repository.get(account_id)
             return existing_account.id
         except AggregateNotFound:
             return account_id
@@ -98,6 +102,33 @@ class Bank(Application):
             return account_id
         raise BadCredentials(email_address)
 
+    def validate_password(self, account_id: UUID, password: str) -> bool:
+        """Validate if the incoming password matchs with the account's password
+
+        Args:
+            account_id (UUID): unique identifier of the account
+            password (str): presunt password
+
+        Raises:
+            BadCredentials: If the password does not match, raise an error.
+
+        Returns:
+            bool
+        """
+        account = self.repository.get(account_id)
+        hashed_password = sha512(password.encode()).hexdigest()
+        if not hashed_password.__eq__(account.hashed_password):
+            raise BadCredentials(account.email_address)
+        return True
+
+    def change_password(
+        self, account_id: UUID, current_password: str, new_password: str
+    ) -> None:
+        if self.validate_password(account_id, current_password):
+            account = self.repository.get(account_id)
+            account.change_password(new_password)
+            self.save(account)
+
     def get_account(self, account_id: UUID) -> Account:
         """Get accunt by its id
 
@@ -109,7 +140,25 @@ class Bank(Application):
         """
         return self.repository.get(account_id)
 
-    def deposit(self, account_id: UUID, amount: int) -> None:
+    def get_balance(self, account_id: UUID) -> int:
+        """Get balance by account ID
+
+        Args:
+            account_id (UUID): unique identifier of the account
+
+        Returns:
+            int: Balance in the account
+        """
+        try:
+            account = self.repository.get(account_id)
+        except AggregateNotFound:
+            raise AccountNotFoundError(
+                f"Account with ID {account_id} not found"
+            )
+
+        return account.balance
+
+    def deposit_funds(self, account_id: UUID, amount: int) -> None:
         """Function used to make deposits in your account.
 
 
@@ -118,10 +167,11 @@ class Bank(Application):
             amount (int): Amount you want to deposit in the account
         """
         account = self.repository.get(account_id)
+        account.check_if_closed()
         account.credit(amount)
         self.save(account)
 
-    def transfer(
+    def transfer_funds(
         self,
         source_account_id: UUID,
         destination_account_id: UUID,
@@ -145,12 +195,15 @@ class Bank(Application):
         if source_account_id == destination_account_id:
             raise TransactionError("Cannot transfer to the same account")
 
+        source_account.check_if_closed()
+        destination_account.check_if_closed()
+
         source_account.debit(amount)
         destination_account.credit(amount)
 
         self.save(source_account, destination_account)
 
-    def withdraw(self, account_id: UUID, amount: int) -> None:
+    def withdraw_funds(self, account_id: UUID, amount: int) -> None:
         """Function used to make withdraws.
 
         Args:
@@ -158,5 +211,16 @@ class Bank(Application):
             amount (int): amount you want to get
         """
         account = self.repository.get(account_id)
+        account.check_if_closed()
         account.debit(amount)
+        self.save(account)
+
+    def get_overdraft_limit(self, account_id: UUID) -> int:
+        account = self.repository.get(account_id)
+        return account.get_overdraft_limit()
+
+    def set_overdraft_limit(self, account_id: UUID, amount: int) -> None:
+        account = self.repository.get(account_id)
+        account.check_if_closed()
+        account.set_overdraft_limit(amount)
         self.save(account)

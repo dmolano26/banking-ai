@@ -38,6 +38,16 @@ class Account(Aggregate):
         self.hashed_password = sha512(password.encode("utf-8")).hexdigest()
         self.balance = 0
         self.is_closed = False
+        self._overdraft_limit = 0
+
+    def get_overdraft_limit(self) -> int:
+        return self._overdraft_limit
+
+    @event("SetOverdraftLimit")
+    def set_overdraft_limit(self, amount: int) -> None:
+        if amount < 0:
+            raise AssertionError("Overdraft limit cannot be negative")
+        self._overdraft_limit = amount
 
     @event("Closed")
     def close_account(self) -> None:
@@ -47,7 +57,29 @@ class Account(Aggregate):
         if self.is_closed:
             raise AccountClosedError(self._id)
 
+    @event("PasswordChanged")
+    def change_password(self, new_password: str) -> None:
+        """Change the password to the account
+
+        Args:
+            new_password (str)
+        """
+        new_hashed_password = sha512(new_password.encode()).hexdigest()
+        self.hashed_password = new_hashed_password
+
     def authenticate(self, email_address: str, password: str) -> None:
+        """Function used to make the authentication of the account
+
+        Args:
+            email_address (str)
+            password (str)
+
+        Raises:
+            BadCredentials
+
+        Returns:
+            _type_: _description_
+        """
         hashed_password = sha512(password.encode()).hexdigest()
 
         if (
@@ -62,13 +94,16 @@ class Account(Aggregate):
         """aggregate to debit
 
         Args:
-            amount_in_cents (int): mount to debit
+            amount_in_cents (int): amount to debit
 
         Raises:
             InsufficientFundsError: if the account has insufficient
             funds, it raises an error
         """
-        if self.balance >= amount_in_cents:
+        if amount_in_cents < 0:
+            raise ValueError("Amount to debit can't be less than 0")
+
+        if self.balance + self._overdraft_limit >= amount_in_cents:
             self.balance -= amount_in_cents
         else:
             raise InsufficientFundsError(self.balance, amount_in_cents)
@@ -78,6 +113,6 @@ class Account(Aggregate):
         """aggregate to get a credit
 
         Args:
-            amount_in_cents (int): mount you want to get as a credit
+            amount_in_cents (int)
         """
         self.balance += amount_in_cents

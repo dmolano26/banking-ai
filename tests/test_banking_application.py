@@ -4,12 +4,17 @@ import typing
 from uuid import UUID
 
 import pytest
+from werkzeug.exceptions import BadRequest
+from eventsourcing.application import AggregateNotFound
+
 
 from banking.applicationmodel import Bank, AccountNotFoundError
-from banking.domainmodel import (
+from banking.utils.error_handler import error_handler
+from banking.utils.custom_exceptions import (
     AccountClosedError,
     InsufficientFundsError,
     BadCredentials,
+    TransactionError,
 )
 
 
@@ -30,14 +35,14 @@ def _create_alice_with_200(app: Bank) -> UUID:
 
     # Deposit funds in alice.
     app.deposit_funds(
-        credit_account_id=alice,
-        amount_in_cents=10000,
+        account_id=alice,
+        amount=10000,
     )
 
     # Deposit funds in alice.
     app.deposit_funds(
-        credit_account_id=alice,
-        amount_in_cents=10000,
+        account_id=alice,
+        amount=10000,
     )
 
     return alice
@@ -56,14 +61,14 @@ def _create_bob(app: Bank) -> UUID:
 
     # Deposit funds in bob.
     app.deposit_funds(
-        credit_account_id=bob,
-        amount_in_cents=100,
+        account_id=bob,
+        amount=100,
     )
 
     # Deposit funds in bob.
     app.deposit_funds(
-        credit_account_id=bob,
-        amount_in_cents=100,
+        account_id=bob,
+        amount=100,
     )
 
     return bob
@@ -82,8 +87,8 @@ def _create_sue(app: Bank) -> UUID:
 
     # Deposit funds in sue.
     app.deposit_funds(
-        credit_account_id=sue,
-        amount_in_cents=100,
+        account_id=sue,
+        amount=100,
     )
 
     return sue
@@ -117,8 +122,8 @@ def test_withdraw() -> None:
 
     # Withdraw funds from alice.
     app.withdraw_funds(
-        debit_account_id=alice,
-        amount_in_cents=5000,
+        account_id=alice,
+        amount=5000,
     )
 
     # Check balance of alice.
@@ -133,8 +138,8 @@ def test_insufficient() -> None:
     # Fail to withdraw funds from alice- insufficient funds.
     with pytest.raises(InsufficientFundsError):
         app.withdraw_funds(
-            debit_account_id=alice,
-            amount_in_cents=25000,
+            account_id=alice,
+            amount=25000,
         )
 
     # Check balance of alice - should be unchanged.
@@ -150,16 +155,16 @@ def test_transfer() -> None:
 
     # Transfer funds from alice to bob.
     app.transfer_funds(
-        debit_account_id=alice,
-        credit_account_id=bob,
-        amount_in_cents=5000,
+        source_account_id=alice,
+        destination_account_id=bob,
+        amount=5000,
     )
 
     # Transfer funds from bob to sue.
     app.transfer_funds(
-        debit_account_id=bob,
-        credit_account_id=sue,
-        amount_in_cents=100,
+        source_account_id=bob,
+        destination_account_id=sue,
+        amount=100,
     )
 
     # Check balances.
@@ -170,15 +175,23 @@ def test_transfer() -> None:
     # Fail to transfer funds - insufficient funds.
     with pytest.raises(InsufficientFundsError):
         app.transfer_funds(
-            debit_account_id=alice,
-            credit_account_id=bob,
-            amount_in_cents=100000,
+            source_account_id=alice,
+            destination_account_id=bob,
+            amount=100000,
         )
 
     # Check balances - should be unchanged.
     assertEqual(app.get_balance(alice), 15000)
     assertEqual(app.get_balance(bob), 5100)
     assertEqual(app.get_balance(sue), 200)
+
+    # Fail to transfer funds - transfer to the same account.
+    with pytest.raises(TransactionError):
+        app.transfer_funds(
+            source_account_id=alice,
+            destination_account_id=alice,
+            amount=100000,
+        )
 
 
 def test_closed() -> None:
@@ -193,30 +206,30 @@ def test_closed() -> None:
     # Fail to transfer funds - alice  is closed.
     with pytest.raises(AccountClosedError):
         app.transfer_funds(
-            debit_account_id=alice,
-            credit_account_id=bob,
-            amount_in_cents=5000,
+            source_account_id=alice,
+            destination_account_id=bob,
+            amount=5000,
         )
 
     # Fail to withdraw funds - alice is closed.
     with pytest.raises(AccountClosedError):
         app.withdraw_funds(
-            debit_account_id=alice,
-            amount_in_cents=100,
+            account_id=alice,
+            amount=100,
         )
 
     # Fail to deposit funds - alice is closed.
     with pytest.raises(AccountClosedError):
         app.deposit_funds(
-            credit_account_id=alice,
-            amount_in_cents=100000,
+            account_id=alice,
+            amount=100000,
         )
 
     # Fail to set overdraft limit on alice - account is closed.
     with pytest.raises(AccountClosedError):
         app.set_overdraft_limit(
             account_id=alice,
-            amount_in_cents=50000,
+            amount=50000,
         )
 
     # Check balances - should be unchanged.
@@ -257,14 +270,14 @@ def test_overdraft() -> None:
     # Set overdraft limit on bob.
     app.set_overdraft_limit(
         account_id=bob,
-        amount_in_cents=50000,
+        amount=50000,
     )
 
     # Can't set negative overdraft limit.
     with pytest.raises(AssertionError):
         app.set_overdraft_limit(
             account_id=bob,
-            amount_in_cents=-50000,
+            amount=-50000,
         )
 
     # Check overdraft limit of bob.
@@ -275,8 +288,8 @@ def test_overdraft() -> None:
 
     # Withdraw funds from bob.
     app.withdraw_funds(
-        debit_account_id=bob,
-        amount_in_cents=50200,
+        account_id=bob,
+        amount=50200,
     )
 
     # Check balance of bob - should be overdrawn.
@@ -288,8 +301,8 @@ def test_overdraft() -> None:
     # Fail to withdraw funds from bob - insufficient funds.
     with pytest.raises(InsufficientFundsError):
         app.withdraw_funds(
-            debit_account_id=bob,
-            amount_in_cents=100,
+            account_id=bob,
+            amount=100,
         )
 
 
@@ -303,3 +316,42 @@ def test_password() -> None:
     app.validate_password(alice, "alice2")
     with pytest.raises(BadCredentials):
         app.validate_password(alice, "alice")
+
+
+def test_error_handler_decorator():
+    @error_handler
+    def raise_aggregate_not_found():
+        raise AggregateNotFound()
+
+    @error_handler
+    def raise_bad_credentials():
+        raise BadCredentials("Bad credentials.")
+
+    @error_handler
+    def raise_transaction_error():
+        raise TransactionError("Transaction error.")
+
+    @error_handler
+    def raise_generic_exception():
+        raise Exception("Generic exception.")
+
+    # Test AggregateNotFound handling
+    response, status_code = raise_aggregate_not_found()
+    assert response == {"error": "Account not found."}
+    assert status_code == 404
+
+    # Test BadCredentials handling
+    response, status_code = raise_bad_credentials()
+    assert response == {
+        "error": "Bad credentials for email address: Bad credentials."
+    }
+    assert status_code == 401
+
+    # Test TransactionError handling
+    response, status_code = raise_transaction_error()
+    assert response == {"error": "Transaction error."}
+    assert status_code == 400
+
+    # Test generic Exception handling
+    with pytest.raises(BadRequest):
+        raise_generic_exception()
